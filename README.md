@@ -4,6 +4,7 @@ The dataset provides the twitter data of Elon Musk from2010-2021. For analysis c
 the years 2017-2021. Each year has thousands of tweets. Assume each year to be a
 document (all the tweets in one year will be considered as a document).
 
+The following has been done:
 
 1. Compute word frequencies for each year. Exclude the stop words
 2. Show top 10 words (for each year) by the highest value of word frequency
