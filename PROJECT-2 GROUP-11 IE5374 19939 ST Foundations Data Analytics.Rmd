@@ -1,0 +1,278 @@
+---
+title: "PROJECT-2 GROUP-11 IE5374 19939 ST Foundations Data Analytics"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Importing all necessary libraries
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(magrittr)
+library(stringr)
+library(igraph)
+library(tidytext)
+library(ggplot2)
+data(stop_words)
+```
+
+Task 1
+
+```{r}
+#Task 1
+#Importing the dataset
+#Creating the adjacent matrix
+#All the below codes are taken from homework 1
+keyword <- read.csv("E:/GRAD/fda/hw1/Keyword_data - Keyword_data.csv", header=TRUE,na.strings=NA)
+keyword
+
+fil_key=keyword%>%select(c("Keyword.1":"Keyword.12")) #Filtering the columns
+fil_key=fil_key[!apply(fil_key == "", 1, all), ] # Removing rows if they have NA in all columns
+
+
+fil_key[fil_key==""]="empty" #Replacing "" with empty  
+
+uni=unname(unlist(fil_key[1,])) #Converting dataframe's row 1 into vector
+
+
+
+c=length(uni)+1 
+
+for (i in 2:nrow(fil_key)){  #Find all unique keywords and store
+  for (j in fil_key[i,]){   
+    if(!(j %in% uni)){        
+      uni[c]=j
+      c=c+1
+      
+      
+      
+    }
+  }
+}
+
+empty_matrix<-matrix(0,length(uni),length(uni)) #create empty matrix of size equals length of unqiue values with 0
+colnames(empty_matrix)=uni #Renaming the column and row names in the matrix
+rownames(empty_matrix)=uni
+
+
+
+for (i in 1:nrow(fil_key)){         #Loop to iterate all articles
+  #print(i)
+  for (j in unname(unlist(fil_key[i,]))){  #Loop to iterate keyword inside each article
+    #print(j)
+    for (k in unname(unlist(fil_key[i,])))  # Loop to iterate keywords to make count
+      {#print(k)
+      if(!(j==k)){
+        #cat(j,k,"\n")
+        empty_matrix[j,k]=empty_matrix[j,k]+1  # Incrementing the count if two keywords are different
+        
+        
+      }
+    }
+  }
+}
+
+z=empty_matrix[rownames(empty_matrix)!="empty", colnames(empty_matrix)!="empty"] #Removing row and column named empty
+
+
+print(z)
+rownames(z)=tolower(rownames(z))
+colnames(z)=tolower(colnames(z))
+
+#The adjacency matrixx is read and computed 
+
+```
+Task 1.2
+
+```{r}
+#Converting to weighted graphs
+#Task 1.2
+#Read the adjacency matrix and convert it into a weighted network
+ig <- graph.adjacency(z, mode="undirected", weighted=TRUE)
+ig <- simplify(ig, remove.multiple = TRUE, remove.loops = TRUE) #Removing repeated connections
+
+#Plotting the graph
+plot(ig,vertex.size= 0.01,edge.arrow.size=0.001,vertex.label.cex = 0.75,margin=-0.5)
+
+#The above query will returns graph of all words connected with each other
+```
+
+Task 1.3
+```{r}
+#Finding degree and strength
+#Task 1.3
+#Compute node degree and strength
+deg <- degree(ig, mode="all")
+stg <- strength(ig, mode="all")
+
+#The function degree, strength will compute the values
+```
+
+Task 1.4
+```{r}
+#Top 10 nodes based on strength
+#Task 1.4
+#Show the top 10 nodes by degree and top 10 nodes by strength
+print(deg%>%sort(decreasing=TRUE)%>%head(10))
+#Top 10 strengths
+stg%>%sort(decreasing=TRUE)%>%head(10)
+#Sorting and showing top 10 rows will return the nodes
+```
+Task 1.5
+
+```{r}
+#Top 10 node pairs
+#Task 1.5
+#Show the top 10 node pairs by weight
+new_mat=z
+z[lower.tri(z)]=0#Getting lower triangular matrix since values are stored twice
+i=0#Counter to show top 10
+mx_c=1#Counter to show maximum value
+sz=sort(z,TRUE)
+while(i<10){
+  
+  temp=which(z==sz[mx_c], arr.ind = TRUE)#Get dataframe  index for values matching
+  for (j in 1:length(rownames(temp))){
+    
+    print(paste0(rownames(z)[temp[j,1]],"<--->",rownames(z)[temp[j,2]]))
+    
+  }
+  i=i+length(rownames(temp))#Incrementing counter
+  mx_c=mx_c+1#Incrementing max value counter
+  
+  
+  
+  
+}
+
+#The above function returns top 10 node pairs
+```
+
+Task 1.6
+```{r}
+#Task 1.6
+#Plot average strength on y-axis and degree on x-axis
+#Strength and Degree plotting
+
+plot(deg, stg, pch = 19, col = "black")
+
+#The above query plots the degree and strength
+
+```
+
+TASK 2
+```{r}
+#Task 2
+#Importing dataset
+s=paste0("E:\\GRAD\\fda\\project 2\\",2017,".csv")
+df=read.csv(s,na.strings = TRUE)
+df=df%>%mutate(Year=2017,tweet_number=row_number())%>%select(tweet,Year,tweet_number)#Mutating Year to dataset along with tweet number
+#Merging all datasets
+for(i in 2018:2021){
+  temp=read.csv(paste0("E:\\GRAD\\fda\\project 2\\",i,".csv"),na.strings = TRUE)
+  temp=temp%>%mutate(Year=i,tweet_number=row_number())%>%select(tweet,Year,tweet_number)
+  df=rbind(df,temp)
+}
+
+
+df2=df
+
+#The above codes merges all data with their respective years
+```
+
+Task 2.1
+```{r}
+#Task 2.1
+#Tokenizing the words and removing stopwords
+df=df%>%unnest_tokens(word, tweet)%>% anti_join(stop_words)
+df$tweet=tolower(df$word)
+
+#Finding Frequency, Rank of the words for each year
+
+op1=df%>%filter(Year==2017)%>%group_by(word)%>%summarize(count=n())%>%arrange(desc(count))%>%mutate(total=sum(count),Year=2017,freq=count/total,rank = row_number())
+for(i in 2018:2021){
+  temp=df%>%filter(Year==i)%>%group_by(word)%>%summarize(count=n())%>%arrange(desc(count))%>%mutate(total=sum(count),Year=i,freq=count/total,rank = row_number())
+  op1=rbind(op1,temp)
+  
+}
+
+#The above query finds the frequency, Rank of the data for each year
+```
+Task 2.2
+
+```{r}
+#Showing top 10 words each year
+#Task 2.2
+#Show top 10 words (for each year) by the highest value of word frequency
+op1%>%group_by(Year)%>%slice(1:10)
+```
+
+Task 2.3
+```{r}
+#Task 2.3
+#Plot histogram of word frequencies for each year
+op1$count=as.integer(op1$count)
+ggplot(op1%>%filter(Year==2017), aes(x=count)) + geom_histogram(stat = "bin",bin = 1000 )
+ggplot(op1%>%filter(Year==2018), aes(x=count)) + geom_histogram(stat = "bin",bin = 1000 )
+ggplot(op1%>%filter(Year==2019), aes(x=count)) + geom_histogram(stat = "bin",bin = 1000 )
+ggplot(op1%>%filter(Year==2020), aes(x=count)) + geom_histogram(stat = "bin",bin = 1000 )
+ggplot(op1%>%filter(Year==2021), aes(x=count)) + geom_histogram(stat = "bin",bin = 1000 )
+```
+
+Task 2.4
+```{r}
+#Task 2.4
+#Use Zipf’s law and plot log-log plots of word frequencies and rank for each year
+op1 %>% 
+  ggplot(aes(rank, freq, color = as.factor(Year)))+
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+#The above query plots the word frequencies and rank for each year
+```
+
+Task 2.5
+```{r}
+#Task 2.5
+#Creating Bi-gram
+df2=df2 %>%
+  unnest_tokens(bigram, tweet, token = "ngrams", n = 2)
+
+#Seperating the bigrams
+op2=df2%>%group_by(Year)%>%
+  separate(bigram, c("word1", "word2"), sep = " ")%>%count(word1,word2, sort = TRUE)
+
+#Removing bigrams containing stopwords
+temp_vec=vector()#Creating empty vector to store index of dataframe containing stopwords
+counter=1#Creating index for vector
+for (i in 1:length(rownames(op2))){
+  if(op2[i,2] %in% stop_words$word & op2[i,3] %in% stop_words$word){
+    temp_vec[counter]=i
+    counter=counter+1
+  }
+  
+}
+op2=op2[-c(temp_vec),]
+
+#Converting df to graph
+for (i in 2017:2021){
+  ig2 <- graph.data.frame(op2%>%filter(Year==2021 & n>20)%>%ungroup()%>%select(c(word1,word2)), directed = TRUE)
+  #Plotting the bigrams in chart
+  plot(ig2,vertex.size= 0.01,edge.arrow.size=0.001,vertex.label.cex = 0.75)
+  
+}
+
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
